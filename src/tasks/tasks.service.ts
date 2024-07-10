@@ -5,6 +5,7 @@ import { Task } from './task.entity';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { TaskStatus } from './task-status.enum';
 import { GetTasksFilterDto } from './dto/get-task-filter.dto';
+import { User } from 'src/auth/user.entity';
 
 @Injectable()
 export class TasksService {
@@ -13,18 +14,8 @@ export class TasksService {
     private tasksRepository: MongoRepository<Task>,
   ) {}
 
-  async getTasks(filterDto: GetTasksFilterDto): Promise<Task[]> {
-    //   if (status) {
-    //     tasks = tasks.filter((task) => task.status === status);
-    //   }
-    //   if (search) {
-    //     tasks = tasks.filter(
-    //       (task) =>
-    //         task.title.toLowerCase().includes(search) ||
-    //         task.description.toLowerCase().includes(search),
-    //     );
-    //   }
-    return this.getTasksFromRepo(filterDto);
+  async getTasks(filterDto: GetTasksFilterDto, user: User): Promise<Task[]> {
+    return this.getTasksRepo(filterDto, user);
   }
 
   async getTaskById(id: string): Promise<Task> {
@@ -37,13 +28,14 @@ export class TasksService {
     return found;
   }
 
-  async createTask(createTaskDto: CreateTaskDto): Promise<Task> {
+  async createTask(createTaskDto: CreateTaskDto, user: User): Promise<Task> {
     const { title, description } = createTaskDto;
 
     const task = this.tasksRepository.create({
       title,
       description,
       status: TaskStatus.OPEN,
+      user,
     });
 
     await this.tasksRepository.save(task);
@@ -66,16 +58,24 @@ export class TasksService {
     }
   }
 
-  // TO REPOSITORY FILE??
-  async getTasksFromRepo(filterDto: GetTasksFilterDto): Promise<Task[]> {
+  // IN VIDEO PLACED IN REPO FILE
+  async getTasksRepo(
+    filterDto: GetTasksFilterDto,
+    user: User,
+  ): Promise<Task[]> {
     const { status, search } = filterDto;
     const query = this.tasksRepository.createQueryBuilder('task');
+    query.where({ user });
 
     if (status) {
       query.andWhere('task.status = :status', { status });
     }
 
     if (search) {
+      query.andWhere(
+        '(LOWER(task.title) LIKE LOWER(:search) OR LOWER(task.description) LIKE LOWER(:search))',
+        { search: `%${search}%` },
+      );
     }
 
     const tasks = await query.getMany();
