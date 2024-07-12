@@ -5,23 +5,22 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { MongoRepository } from 'typeorm';
-import { User } from './user.entity';
 import { AuthCredentialsDto } from './dto/auth-credentials.dto';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
-import { JwtPayload } from 'src/jwt.payload.interface';
+import { JwtPayload } from '../jwt.payload.interface';
+import { UsersRepository } from './users.repository';
 
 @Injectable()
 export class AuthService {
   constructor(
-    @InjectRepository(User)
-    private usersRepository: MongoRepository<User>,
+    @InjectRepository(UsersRepository)
+    private usersRepository: UsersRepository,
     private jwtService: JwtService,
   ) {}
 
   async signUp(authCredentialsDto: AuthCredentialsDto): Promise<void> {
-    return this.createUserRepo(authCredentialsDto);
+    return this.usersRepository.createUser(authCredentialsDto);
   }
 
   async signIn(
@@ -37,31 +36,6 @@ export class AuthService {
       return { accessToken };
     } else {
       throw new UnauthorizedException('Please check your login credentials.');
-    }
-  }
-
-  // IN VIDEO PLACED IN REPO FILE - USER REPOSITORY
-  async createUserRepo(authCredentialsDto: AuthCredentialsDto): Promise<void> {
-    const { username, password } = authCredentialsDto;
-
-    const salt = await bcrypt.genSalt();
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    const user = this.usersRepository.create({
-      username,
-      password: hashedPassword,
-    });
-
-    try {
-      await this.usersRepository.save(user);
-    } catch (error) {
-      if (error.code === '23505') {
-        // duplicate username
-        throw new ConflictException('Username already exists');
-      } else {
-        console.log(error);
-        throw new InternalServerErrorException();
-      }
     }
   }
 }
